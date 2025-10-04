@@ -9,7 +9,9 @@ from keras.models import load_model
 from tasks.gridworld import Shapes
 from agents.buffer import ReplayBuffer
 from agents.dqn import DQN
-
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 def load_cfg(path="configs/config.cfg"):
     cfg = configparser.ConfigParser()
@@ -32,18 +34,40 @@ def load_cfg(path="configs/config.cfg"):
     return conf
 
 
+class MLP(nn.Module):
+    def __init__(self, input_dim, output_dim, learning_rate=1e-3):
+        super(MLP, self).__init__()
+        
+        # --- 1. DEFINE the network here ---
+        # Let's call it self.network
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, output_dim)
+        )
+        
+        # --- 2. USE the SAME name here ---
+        # The optimizer needs the parameters from the self.network instance
+        self.optimizer = optim.Adam(self.network.parameters(), lr=learning_rate)
+        
+        self.loss = nn.MSELoss()
+
+    def forward(self, x):
+        # --- 3. And USE it again here ---
+        return self.network(x)
+
 
 
 
 def main():
-    def mlp_build():
-        model = models.Sequential([
-            layers.Input(shape=(task.encode_dim(),)),layers.Dense(128, activation="relu"),layers.Dense(128, activation="relu"),
-            layers.Dense(task.action_count(), activation="linear")
-        ])
-        model.compile(optimizer=optimizers.Adam(learning_rate=1e-3),loss='mse')
-        return model
     
+    def mlp_build():
+        input_dim = task.encode_dim()
+        output_dim = task.action_count()
+        model = MLP(input_dim, output_dim, learning_rate=1e-3)
+        return model
     conf = load_cfg("configs/config.cfg")
     maze = conf["maze"]
     task = Shapes(maze=maze,shape_rewards={'1':10,'2':0,'3':0})
