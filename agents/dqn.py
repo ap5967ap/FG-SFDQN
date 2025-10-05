@@ -44,54 +44,55 @@ class DQN(Agent):
         with torch.no_grad():
             s_enc_tensor = torch.from_numpy(s_enc).float()
             q_values = self.Q(s_enc_tensor)
-        return q_values.numpy()
+        return q_values.cpu().numpy()
 
     
     def train_agent(self, s, s_enc, a, r, s1, s1_enc, gamma):
-        
         # remember this experience
         self.buffer.append(s_enc, a, r, s1_enc, gamma)
-        
+
         # sample experience at random
         batch = self.buffer.replay()
-        if batch is None: return
+        if batch is None:
+            return
         states, actions, rewards, next_states, gammas = batch
+
+        # Convert to tensors
         states = torch.from_numpy(states).float()
         actions = torch.from_numpy(actions).long()
         rewards = torch.from_numpy(rewards).float().flatten()
         next_states = torch.from_numpy(next_states).float()
         gammas = torch.from_numpy(gammas).float()
 
+        # Move all tensors to the same device as the model
+        device = self.Q.network[0].weight.device
+        states = states.to(device)
+        actions = actions.to(device)
+        rewards = rewards.to(device)
+        next_states = next_states.to(device)
+        gammas = gammas.to(device)
+
         n_batch = self.buffer.n_batch
         indices = np.arange(n_batch)
         rewards = rewards.flatten()
 
         # main update
-        # next_actions = np.argmax(self.Q.predict_on_batch(next_states), axis=1)
-        # targets = self.Q.predict_on_batch(states)
-        # targets[indices, actions] = rewards + gammas * self.target_Q.predict_on_batch(next_states)[indices, next_actions]
-        # self.Q.train_on_batch(states, targets)
-        
-        
         self.Q.optimizer.zero_grad()
         q_values = self.Q(states)
         q_values_next = self.Q(next_states)
         target_q_values_next = self.target_Q(next_states)
         next_actions = torch.argmax(q_values_next, dim=1)
-        
+
         q_value_targets = q_values.clone().detach()
-        q_value_targets[indices, actions] = rewards + gammas * target_q_values_next[indices,next_actions]
-        
+        q_value_targets[indices, actions] = rewards + gammas * target_q_values_next[indices, next_actions]
+
         loss = self.Q.loss(q_values, q_value_targets)
         loss.backward()
         self.Q.optimizer.step()
 
-
-        
         # target update
         self.updates_since_target_updated += 1
         if self.updates_since_target_updated >= self.target_update_ev:
-            # self.target_Q.set_weights(self.Q.get_weights())
             self.target_Q.load_state_dict(self.Q.state_dict())
             self.updates_since_target_updated = 0
     

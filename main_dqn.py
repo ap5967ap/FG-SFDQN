@@ -3,15 +3,15 @@ import ast
 import os
 import time
 import numpy as np
-import tensorflow as tf
-from keras import layers, models, optimizers, losses
-from keras.models import load_model
 from tasks.gridworld import Shapes
 from agents.buffer import ReplayBuffer
 from agents.dqn import DQN
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
+# Set device to GPU if available
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def load_cfg(path="configs/config.cfg"):
     cfg = configparser.ConfigParser()
@@ -46,7 +46,7 @@ class MLP(nn.Module):
             nn.Linear(128, 128),
             nn.ReLU(),
             nn.Linear(128, output_dim)
-        )
+        ).to(device)
         
         # --- 2. USE the SAME name here ---
         # The optimizer needs the parameters from the self.network instance
@@ -56,7 +56,7 @@ class MLP(nn.Module):
 
     def forward(self, x):
         # --- 3. And USE it again here ---
-        return self.network(x)
+        return self.network(x.to(device))
 
 
 
