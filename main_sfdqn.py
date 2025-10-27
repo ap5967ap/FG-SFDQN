@@ -29,7 +29,7 @@ def load_cfg(path="configs/config.cfg"):
 	conf["save_ev"] = cfg.getint("AGENT", "save_ev")
 
 	conf["ql_lr"] = cfg.getfloat("QL", "learning_rate")
-	conf["sf_lr"] = cfg.getfloat("SF", "learning_rate")
+	conf["sf_lr"] = cfg.getfloat("SFQL", "learning_rate")
 	return conf
 
 
