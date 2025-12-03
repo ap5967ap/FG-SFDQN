@@ -12,14 +12,24 @@ class SFNetwork(nn.Module):
         self.input_dim = input_dim
         self.n_actions = n_actions
         self.n_features = n_features
-        # Simple MLP, can be replaced with more complex architectures
+        # Simple MLP
         self.net = nn.Sequential(
             nn.Linear(input_dim, 128),
-            nn.ReLU(),
+            nn.SELU(),
             nn.Linear(128, 128),
-            nn.ReLU(),
+            nn.SELU(),
             nn.Linear(128, n_actions * n_features)
         )
+        # Initialize weights
+        self._initialize_weights()
+        
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, np.sqrt(1.0 / m.weight.shape[1]))
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+    
     def forward(self, x):
         out = self.net(x)
         # Reshape to [batch, n_actions, n_features]
@@ -143,6 +153,10 @@ class DeepSF(SF):
 
         optimizer.zero_grad()
         loss.backward()
+        
+        # Gradient clipping to prevent explosion
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        
         optimizer.step()
 
         # Update target network
