@@ -32,6 +32,7 @@ class SFDQN(Agent):
         
     def get_Q_values(self, s, s_enc):
         import torch
+        # print("s_enc",s_enc)
         s_enc_tensor = torch.from_numpy(s_enc).float()
         q, c = self.sf.GPI(s_enc_tensor, self.task_index, update_counters=self.use_gpi)
         if not self.use_gpi:

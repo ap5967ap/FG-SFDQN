@@ -40,12 +40,16 @@ class DeepSF(SF):
     A successor feature representation implemented using PyTorch. Accepts a wide variety of neural networks as
     function approximators.
     """
-    def __init__(self, input_dim, n_actions, n_features=None, learning_rate=1e-3, target_update_ev=1000, device=None, *args, **kwargs):
-        super(DeepSF, self).__init__(learning_rate, *args, **kwargs)
+    def __init__(self, input_dim, n_actions, n_features=None,
+                 learning_rate=1e-3, learning_rate_w=0.5,
+                 target_update_ev=1000, device=None, *args, **kwargs):
+        # pass the reward-learning rate to SF.__init__
+        super(DeepSF, self).__init__(learning_rate_w, *args, **kwargs)
+
         self.input_dim = input_dim
         self.n_actions = n_actions
-        self.n_features = n_features if n_features is not None else n_actions  # fallback
-        self.learning_rate = learning_rate
+        self.n_features = n_features if n_features is not None else n_actions
+        self.learning_rate = learning_rate               # network LR
         self.target_update_ev = target_update_ev
         self.device = device or (torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         self.updates_since_target_updated = []
