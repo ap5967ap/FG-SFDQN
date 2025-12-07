@@ -53,6 +53,7 @@ class DeepSF(SF):
         self.target_update_ev = target_update_ev
         self.device = device or (torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         self.updates_since_target_updated = []
+        self.reset()
 
     def reset(self):
         SF.reset(self)
@@ -84,25 +85,34 @@ class DeepSF(SF):
         model, _, _ = self.psi[policy_index]
         model.eval()
         with torch.no_grad():
-            state_tensor = torch.from_numpy(state).float().to(self.device)
-            psi = model(state_tensor)
+            # ensure numpy -> torch and batch-dim
+            arr = np.asarray(state)
+            if arr.ndim == 1:
+                arr = arr[None, ...]
+            state_tensor = torch.from_numpy(arr).float().to(self.device)
+            psi = model(state_tensor)  # torch tensor [B, A, F]
         return psi.cpu().numpy()
 
     def get_successors(self, state):
-        # Stack all models for all tasks
-        # state_tensor = torch.from_numpy(state).float().to(self.device)
-        if not isinstance(state, torch.Tensor):
-            state = torch.from_numpy(state).float()
-        state_tensor = state.to(self.device)
+        arr = state
+        if isinstance(state, torch.Tensor):
+            arr = state.detach().cpu().numpy()
+        arr = np.asarray(arr)
+        if arr.ndim == 1:
+            arr = arr[None, ...]
+        # convert once to torch on device
+        state_tensor = torch.from_numpy(arr).float().to(self.device)
         all_psi = []
         for model, _, _ in self.psi:
             model.eval()
             with torch.no_grad():
-                psi = model(state_tensor)
+                psi = model(state_tensor)  # torch [B, A, F]
                 all_psi.append(psi.cpu().numpy())
-        # Shape: [n_tasks, batch, n_actions, n_features] -> [batch, n_tasks, n_actions, n_features]
-        all_psi = np.stack(all_psi, axis=1)
+        # all_psi: list of length n_tasks; each element [B, A, F]
+        all_psi = np.stack(all_psi, axis=0)          # [n_tasks, B, A, F]
+        all_psi = np.transpose(all_psi, (1, 0, 2, 3))  # [B, n_tasks, A, F] #!SUS
         return all_psi
+
 
     def update_successor(self, transitions, policy_index):
         if transitions is None:
@@ -135,21 +145,30 @@ class DeepSF(SF):
             gammas = gammas.float().to(self.device).view(-1, 1)
 
         n_batch = states.shape[0]
-        indices = np.arange(n_batch)
+        device = self.device
+        indices_t = torch.arange(n_batch, device=device, dtype=torch.long)
+
 
         # Next actions come from GPI
-        q1, _ = self.GPI(next_states.cpu().numpy(), policy_index)
-        next_actions = np.argmax(np.max(q1, axis=1), axis=-1)
-        next_actions = torch.from_numpy(next_actions).long().to(self.device)
+        next_states_np = next_states.detach().cpu().numpy()
+        q1, _ = self.GPI(next_states_np, policy_index)
+        next_actions_np = np.argmax(np.max(q1, axis=1), axis=-1)
+        next_actions = torch.from_numpy(next_actions_np).long().to(device)
+
 
         # Compute targets
         with torch.no_grad():
-            target_psi_next = target_model(next_states)[indices, next_actions, :]
+            target_out = target_model(next_states)  # [B, A, F]
+            target_psi_next = target_out[indices_t, next_actions, :]  # [B, F]
+
         targets = phis + gammas * target_psi_next
 
         # Forward pass
+        phis = phis.view(n_batch, -1)  
+        targets = phis + gammas * target_psi_next
+        
         psi_pred = model(states)
-        psi_pred_actions = psi_pred[indices, actions, :]
+        psi_pred_actions = psi_pred[indices_t, actions, :]
 
         # Loss: MSE between predicted and target
         loss_fn = nn.MSELoss()

@@ -20,6 +20,7 @@ class SF:
         self.use_true_reward = use_true_reward
         if len(args) != 0 or len(kwargs) != 0:
             print(self.__class__.__name__ + ' ignoring parameters ' + str(args) + ' and ' + str(kwargs))
+        self.reset()
             
     def build_successor(self, task, source=None):
         """
@@ -139,33 +140,18 @@ class SF:
         self.gpi_counters.append(np.zeros((self.n_tasks,), dtype=int))
         
     def update_reward(self, phi, r, task_index, exact=False):
-        """
-        Updates the reward parameters for the given task based on the observed reward sample
-        from the environment. 
-        
-        Parameters
-        ----------
-        phi : np.ndarray
-            the state features
-        r : float
-            the observed reward from the MDP
-        task_index : integer
-            the index of the task from which this reward was sampled
-        exact : boolean
-            if True, validates the true reward from the environment and the linear representation
-        """
-        
-        # update reward using linear regression
-        w = self.fit_w[task_index]
-        phi = phi.reshape(w.shape)
-        r_fit = np.sum(phi * w)
-        self.fit_w[task_index] = w + self.alpha_w * (r - r_fit) * phi
-    
+        w = np.asarray(self.fit_w[task_index])
+        # Ensure column vector shape (n_features, 1)
+        w = w.reshape(-1, 1)
+        phi = np.asarray(phi).reshape(w.shape)
+        r_fit = float(np.sum(phi * w))
+        self.fit_w[task_index] = (w + self.alpha_w * (r - r_fit) * phi).reshape(w.shape)
         # validate reward
-        r_true = np.sum(phi * self.true_w[task_index])
+        r_true = float(np.sum(phi * np.asarray(self.true_w[task_index]).reshape(w.shape)))
         if exact and not np.allclose(r, r_true):
             raise Exception('sampled reward {} != linear reward {} - please check task {}!'.format(
                 r, r_true, task_index))
+
     
     def GPE_w(self, state, policy_index, w):
         """
@@ -188,8 +174,11 @@ class SF:
             n_batch is the number of states in the state argument
             n_actions is the number of actions in the MDP            
         """
-        psi = self.get_successor(state, policy_index)
-        q = psi @ w  # shape (n_batch, n_actions)
+        w_arr = np.asarray(w).reshape(-1,1)
+        psi = self.get_successor(state, policy_index)  # expected np.ndarray [B, A, F]
+        # matrix multiply: [B, A, F] @ [F,1] -> [B, A, 1]
+        q = np.matmul(psi, w_arr)
+        q = q.reshape(q.shape[0], q.shape[1])  # [B, A]
         return q
         
     def GPE(self, state, policy_index, task_index):
@@ -236,9 +225,14 @@ class SF:
         np.ndarray : the tasks that are active in each state of state_batch in GPi
         """
         psi = self.get_successors(state)
-        q = (psi @ w)[:,:,:, 0]  # shape (n_batch, n_tasks, n_actions)
-        task = np.squeeze(np.argmax(np.max(q, axis=2), axis=1))  # shape (n_batch,)
+        w_arr = np.asarray(w).reshape(-1,1)  # [F,1]
+        # compute q: [B, n_tasks, n_actions, 1] -> squeeze last dim
+        q = np.matmul(psi, w_arr)  # broadcasting matmul
+        q = np.squeeze(q, axis=-1)  # [B, n_tasks, n_actions]
+        # choose best task per state: max over actions then argmax over tasks
+        task = np.argmax(np.max(q, axis=2), axis=1)  # shape [B]
         return q, task
+
     
     def GPI(self, state, task_index, update_counters=False):
         """

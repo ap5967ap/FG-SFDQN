@@ -1,4 +1,5 @@
 # -*- coding: UTF-8 -*-
+import torch
 import random
 import numpy as np
 import time
@@ -31,18 +32,27 @@ class SFDQN(Agent):
         self.test_epsilon = test_epsilon
         
     def get_Q_values(self, s, s_enc):
-        import torch
-        # print("s_enc",s_enc)
-        s_enc_tensor = torch.from_numpy(s_enc).float()
-        q, c = self.sf.GPI(s_enc_tensor, self.task_index, update_counters=self.use_gpi)
+    # Ensure s_enc is numpy array with batch-dim
+        s_enc_arr = np.asarray(s_enc)
+        if s_enc_arr.ndim == 1:
+            s_enc_arr = s_enc_arr[None, ...]  # [1, ...]
+        # Call SF.GPI with numpy (we made SF.GPI expect numpy)
+        q, c = self.sf.GPI(s_enc_arr, self.task_index, update_counters=self.use_gpi)
         if not self.use_gpi:
-            c = self.task_index
+            c = np.asarray(self.task_index)
         self.c = c
-        q_np = q[:, c, :].cpu().numpy() if hasattr(q, 'cpu') else q[:, c, :]
-        return q_np
+        # q: numpy [B, n_tasks, n_actions]
+        q_np = np.asarray(q)
+        if np.isscalar(c):
+            q_sel = q_np[:, int(c), :]   # [B, n_actions]
+        else:
+            c_arr = np.asarray(c, dtype=np.int64)
+            B = q_np.shape[0]
+            q_sel = q_np[np.arange(B), c_arr, :]   # [B, n_actions]
+        return q_sel
+
     
     def train_agent(self, s, s_enc, a, r, s1, s1_enc, gamma):
-        import torch
         # update w
         phi = self.phi(s, a, s1)
         if isinstance(phi, torch.Tensor):
@@ -111,12 +121,23 @@ class SFDQN(Agent):
     
     def get_test_action(self, s_enc, w):
         if random.random() <= self.test_epsilon:
-            a = random.randrange(self.n_actions)
+            return random.randrange(self.n_actions)
+        # ensure s_enc is numpy batch
+        s_enc_arr = np.asarray(s_enc)
+        if s_enc_arr.ndim == 1:
+            s_enc_arr = s_enc_arr[None, ...]
+        q, c = self.sf.GPI_w(s_enc_arr, w)  # q: [B, n_tasks, n_actions]
+        q = np.asarray(q)
+        if np.isscalar(c):
+            q_sel = q[:, int(c), :]
         else:
-            q, c = self.sf.GPI_w(s_enc, w)
-            q = q[:, c,:]
-            a = np.argmax(q)
+            c_arr = np.asarray(c, dtype=int)
+            B = q.shape[0]
+            q_sel = q[np.arange(B), c_arr, :]
+        # return argmax for first state (test uses single-state)
+        a = int(np.argmax(q_sel[0]))
         return a
+
             
     def test_agent(self, task, return_history=False, visualize=False, pause=0.12, max_steps=None):
         """
