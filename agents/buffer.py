@@ -57,12 +57,25 @@ class ConditionalReplayBuffer(ReplayBuffer):
         return (state.tobytes(), int(action))
 
     def append(self, state, action, reward, next_state, gamma):
-        super(ConditionalReplayBuffer, self).append(state, action, reward, next_state, gamma)
-        
-        # TODO: Remove instead of append if buffer is full
-        current_idx = (self.index - 1) % self.n_samples
+        data = (state, action, reward, next_state, gamma)
+        idx = self.index
+        if self.size == self.n_samples:
+            old_state, old_action, _, _, _ = self.buffer[idx]
+            old_key = self._get_key(old_state, old_action)
+            if idx in self.transition_map[old_key]:
+                self.transition_map[old_key].remove(idx)
+            if not self.transition_map[old_key]:
+                del self.transition_map[old_key]
+
+        if self.size < self.n_samples:
+            self.buffer.append(data)
+            self.size += 1
+        else:
+            self.buffer[idx] = data
+
         key = self._get_key(state, action)
-        self.transition_map[key].append(current_idx)
+        self.transition_map[key].append(idx)
+        self.index = (self.index + 1) % self.n_samples
 
     def sample_conditional(self, state, action, n_averaging):
         """

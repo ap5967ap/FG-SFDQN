@@ -72,12 +72,20 @@ class FGSFDQN(SFDQN):
         self.reset()
         for t in train_tasks: self.add_training_task(t)
             
+        # ensures all tasks are initialized correctly
+        for i in range(len(train_tasks)):
+            self.set_active_training_task(i, True)
+            self.active_task.initialize()
+
+        
         self.set_active_training_task(0)
         for _ in range(self.buffer.n_batch): self.next_sample()
-
+        
         for t in range(n_total_steps):
+            if (t%100 == 0):
+                print(t)
             i = np.random.randint(len(train_tasks))
-            self.set_active_training_task(i)
+            self.set_active_training_task(i, False)
             self.next_sample(viewers[i], n_view_ev)
             
             if self.algorithm == 'alg2':

@@ -113,7 +113,7 @@ class Agent:
             if self.encoding == 'task':
                 self.encoding = task.encode
     
-    def set_active_training_task(self, index):
+    def set_active_training_task(self, index, reset = True):
         """
         Sets the task at the requested index as the current task the agent will train on.
         The index is based on the order in which the training task was added to the agent.
@@ -123,7 +123,8 @@ class Agent:
         self.task_index = index
         self.active_task = self.tasks[index]
         self.phi = self.phis[index]
-        
+        if not reset:
+            return
         # reset task-dependent counters
         self.s = self.s_enc = None
         self.new_episode = True

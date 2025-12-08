@@ -1,13 +1,7 @@
 import configparser
-import ast
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-
 import numpy as np
-import configparser
-import torch
-
 from tasks.gridworld import Shapes
 from agents.sfdqn import SFDQN
 from agents.buffer import ReplayBuffer

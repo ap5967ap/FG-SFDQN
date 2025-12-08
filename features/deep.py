@@ -110,7 +110,7 @@ class DeepSF(SF):
                 all_psi.append(psi.cpu().numpy())
         # all_psi: list of length n_tasks; each element [B, A, F]
         all_psi = np.stack(all_psi, axis=0)          # [n_tasks, B, A, F]
-        all_psi = np.transpose(all_psi, (1, 0, 2, 3))  # [B, n_tasks, A, F] #!SUS
+        all_psi = np.transpose(all_psi, (1, 0, 2, 3))  # [B, n_tasks, A, F]
         return all_psi
 
 
