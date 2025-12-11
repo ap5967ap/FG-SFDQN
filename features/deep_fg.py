@@ -4,8 +4,13 @@ import numpy as np
 from features.deep import DeepSF
 
 class DeepFGSF(DeepSF):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, learning_rate_prior=None, *args, **kwargs):
         super(DeepFGSF, self).__init__(*args, **kwargs)
+        self.learning_rate_prior = learning_rate_prior if learning_rate_prior is not None else self.learning_rate
+
+    def _set_lr(self, optimizer, lr):
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
         
     def _to_tensor(self, x, dtype=torch.float):
         if not isinstance(x, torch.Tensor):
@@ -72,6 +77,11 @@ class DeepFGSF(DeepSF):
         
         for k in tasks_to_update:
             model, _, optimizer = self.psi[k]
+            
+            # Update LR
+            lr = self.learning_rate if k == task_i else self.learning_rate_prior
+            self._set_lr(optimizer, lr)
+
             model.train()
             optimizer.zero_grad()
 
@@ -121,6 +131,11 @@ class DeepFGSF(DeepSF):
 
         for k in tasks_to_update:
             model, _, optimizer = self.psi[k]
+            
+            # Update LR
+            lr = self.learning_rate if k == task_i else self.learning_rate_prior
+            self._set_lr(optimizer, lr)
+
             model.train()
             optimizer.zero_grad()
             
