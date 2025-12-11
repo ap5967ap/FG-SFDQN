@@ -27,9 +27,31 @@ class DeepFGSF(DeepSF):
         next_actions = np.argmax(np.max(q_gpi, axis=1), axis=-1)
         return torch.from_numpy(next_actions).long().to(self.device)
 
+    def _get_next_action_prior(self, next_states, policy_index):
+        """
+        Selects actions using the prior policy for a specific task k:
+        a' = argmax_a (psi_k(s', a) * w_k)
+        """
+        model, _, _ = self.psi[policy_index]
+        model.eval()
+        
+        # Get Features for policy k
+        with torch.no_grad():
+            psi = model(next_states) # [Batch, Actions, Features]
+            
+        # Get Reward Weights for policy k
+        w = torch.from_numpy(self.fit_w[policy_index]).float().to(self.device) # [Features, 1]
+        
+        # Compute Q = psi * w
+        q_values = torch.matmul(psi, w).squeeze(-1) # [B, A, F] x [F, 1] -> [B, A, 1]
+        
+        # Argmax
+        next_actions = torch.argmax(q_values, dim=1)
+        return next_actions
+
     def update_single_sample(self, transition, task_i, task_c):
         """
-        Updates theta^i and theta^c using a single transition (s, a, s') Algos. (1,2).
+        Updates theta^i and theta^c using a single transition (s, a, s')
         """
         states, actions, phis, next_states, gammas = transition
         
@@ -52,9 +74,13 @@ class DeepFGSF(DeepSF):
             model, _, optimizer = self.psi[k]
             model.train()
             optimizer.zero_grad()
-            
-            # GPI Action Selection for s': a' = argmax Q(s', a'; theta) using current task reward
-            next_acts = self._get_next_actions_gpi(next_states, task_i)
+
+            if k==task_i:
+                # Current task: Use GPI action
+                next_acts = self._get_next_actions_gpi(next_states, task_i)
+            else:
+                # Prior Task
+                next_acts = self._get_next_action_prior(next_states, k)
             
             # Prediction: xi_k(s, a)
             pred_all = model(states)
@@ -103,8 +129,10 @@ class DeepFGSF(DeepSF):
             xi_s = pred_pivot[0, pivot_action, :] # [dim]
             
             # Compute Averaged Target over N samples
-            # Get next actions using GPI for all N samples
-            next_acts = self._get_next_actions_gpi(c_nexts, task_i) # [N]
+            if k == task_i:
+                next_acts = self._get_next_actions_gpi(c_nexts, task_i)
+            else:
+                next_acts = self._get_next_action_prior(c_nexts, k)
             
             pred_next_all = model(c_nexts) # [N, n_actions, dim]
             indices = torch.arange(c_nexts.shape[0])
