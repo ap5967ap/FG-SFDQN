@@ -1,5 +1,6 @@
 import numpy as np
 from collections import defaultdict
+import torch
 
 class ReplayBuffer:
     def __init__(self, n_samples=1000000, n_batch=32):
@@ -53,7 +54,8 @@ class ConditionalReplayBuffer(ReplayBuffer):
         self.transition_map.clear()
 
     def _get_key(self, state, action):
-        # state is a numpy array, use bytes as hashable key.
+        if isinstance(state, torch.Tensor):
+            state = state.detach().cpu().numpy()
         return (state.tobytes(), int(action))
 
     def append(self, state, action, reward, next_state, gamma):

@@ -6,9 +6,9 @@ import torch.nn as nn
 import torch.optim as optim
 from features.successor import SF
 
-class SFNetwork(nn.Module):
+class SFNetwork1(nn.Module):
     def __init__(self, input_dim, n_actions, n_features):
-        super(SFNetwork, self).__init__()
+        super(SFNetwork1, self).__init__()
         self.input_dim = input_dim
         self.n_actions = n_actions
         self.n_features = n_features
@@ -34,6 +34,35 @@ class SFNetwork(nn.Module):
         out = self.net(x)
         # Reshape to [batch, n_actions, n_features]
         return out.view(-1, self.n_actions, self.n_features)
+
+class SFNetwork2(nn.Module):
+    def __init__(self, input_dim, n_actions, n_features, hidden_dims=[256, 256]):
+        super(SFNetwork2, self).__init__()
+        self.n_actions = n_actions
+        self.n_features = n_features
+
+        layers = []
+        
+        for h_dim in hidden_dims:
+            layers.append(nn.Linear(input_dim, h_dim))
+            layers.append(nn.ReLU()) 
+            input_dim = h_dim
+            
+        self.feature_extractor = nn.Sequential(*layers)
+
+        self.output_layer = nn.Linear(input_dim, n_actions * n_features)
+        self._initialize_weights()
+        
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, np.sqrt(1.0 / m.weight.shape[1]))
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+    def forward(self, x):
+        x = self.feature_extractor(x)
+        x = self.output_layer(x)
+        return x.view(-1, self.n_actions, self.n_features)
 
 class DeepSF(SF):
     """
@@ -67,8 +96,17 @@ class DeepSF(SF):
             self.input_dim = task.encode_dim()
 
         # Build SF network
-        model = SFNetwork(self.input_dim, self.n_actions, self.n_features).to(self.device)
-        target_model = SFNetwork(self.input_dim, self.n_actions, self.n_features).to(self.device)
+        model, target_model = None
+        if task._tasktype() == 0: # gridworld
+            model = SFNetwork1(self.input_dim, self.n_actions, self.n_features).to(self.device)
+            target_model = SFNetwork1(self.input_dim, self.n_actions, self.n_features).to(self.device)
+        elif task._tasktype() == 1: # reacher
+            model = SFNetwork2(self.input_dim, self.n_actions, self.n_features).to(self.device)
+            target_model = SFNetwork2(self.input_dim, self.n_actions, self.n_features).to(self.device)
+        else:
+            model = SFNetwork1(self.input_dim, self.n_actions, self.n_features).to(self.device)
+            target_model = SFNetwork1(self.input_dim, self.n_actions, self.n_features).to(self.device)
+            
         target_model.load_state_dict(model.state_dict())
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
 

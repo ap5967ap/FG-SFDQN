@@ -13,6 +13,9 @@ class Task:
         """
         raise NotImplementedError
 
+    def _tasktype(self):
+        return NotImplementedError
+
     def initialize(self):
         """
         Resets the state of the environment.

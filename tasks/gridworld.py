@@ -60,6 +60,9 @@ class Shapes(Task):
     def clone(self):
         return Shapes(self.maze, self.shape_rewards)
 
+    def _tasktype(self):
+        return 0
+    
     def initialize(self):
         self.state = (random.choice(self.initial), tuple(0 for _ in range(len(self.shape_ids))))
         return self.state

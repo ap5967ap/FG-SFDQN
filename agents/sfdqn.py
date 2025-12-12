@@ -57,6 +57,11 @@ class SFDQN(Agent):
         phi = self.phi(s, a, s1)
         if isinstance(phi, torch.Tensor):
             phi = phi.detach().cpu().numpy()
+        if isinstance(s_enc, torch.Tensor): 
+            s_enc = s_enc.detach().cpu().numpy()
+        
+        if isinstance(s1_enc, torch.Tensor): 
+            s1_enc = s1_enc.detach().cpu().numpy()
         self.sf.update_reward(phi, r, self.task_index)
         # remember this experience
         self.buffer.append(s_enc, a, phi, s1_enc, gamma)
@@ -86,7 +91,13 @@ class SFDQN(Agent):
     def get_progress_strings(self):
         sample_str, reward_str = super(SFDQN, self).get_progress_strings()
         gpi_percent = self.sf.GPI_usage_percent(self.task_index)
-        w_error = np.linalg.norm(self.sf.fit_w[self.task_index] - self.sf.true_w[self.task_index])
+        fit_w = self.sf.fit_w[self.task_index]
+        true_w = self.sf.true_w[self.task_index]
+        if isinstance(true_w, torch.Tensor):
+            true_w = true_w.detach().cpu().numpy()
+        if isinstance(fit_w, torch.Tensor):
+            fit_w = fit_w.detach().cpu().numpy()
+        w_error = np.linalg.norm(fit_w - true_w)
         gpi_str = 'GPI% \t {:.4f} \t w_err \t {:.4f}'.format(gpi_percent, w_error)
         return sample_str, reward_str, gpi_str
             
