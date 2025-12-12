@@ -53,6 +53,42 @@ class DeepFGSF(DeepSF):
         # Argmax
         next_actions = torch.argmax(q_values, dim=1)
         return next_actions
+    
+    def get_averaged_gpi_policy_index(self, next_states, task_index):
+        """
+        Determines the prior policy 'c' by averaging the SFs of the batch 
+        of next states and then applying GPI.
+        """
+        if not isinstance(next_states, torch.Tensor):
+            next_states = self._to_tensor(next_states)
+
+        # Get the reward weights for the current task
+        w = torch.from_numpy(self.fit_w[task_index]).float().to(self.device)
+        
+        best_policy_idx = -1
+        best_q_val = -float('inf')
+
+        # Evaluate every policy k
+        for k in range(self.n_tasks):
+            model, _, _ = self.psi[k]
+            model.eval()
+            with torch.no_grad():
+                # Compute SFs for all samples in batch [N, Actions, Features]
+                all_sfs = model(next_states)
+                
+                # Average the SFs across the batch dimension
+                # This approximates E[xi(s', a')]
+                avg_sf = torch.mean(all_sfs, dim=0) 
+                
+                # Compute Q-values using current task weights
+                q_vals = torch.matmul(avg_sf, w) # [Actions]
+                max_q = torch.max(q_vals).item()
+                
+                if max_q > best_q_val:
+                    best_q_val = max_q
+                    best_policy_idx = k
+                    
+        return best_policy_idx
 
     def update_single_sample(self, transition, task_i, task_c):
         """
@@ -113,10 +149,6 @@ class DeepFGSF(DeepSF):
     def update_averaged(self, pivot_state, pivot_action, conditional_batch, task_i, task_c):
         """
         Implements averaging for bellman update over N samples.
-        
-        pivot_state: (1, dim)
-        pivot_action: int
-        conditional_batch: tuple of (N, dim) tensors containing N samples for (s, a)
         """
         _, _, c_phis, c_next_states, c_gammas = conditional_batch
         
@@ -139,25 +171,33 @@ class DeepFGSF(DeepSF):
             model.train()
             optimizer.zero_grad()
             
-            # Prediction: xi_k(s, a) (Single value for the pivot)
+            # xi_k(s, a) (Single value for the pivot)
             pred_pivot = model(pivot_state_t) # [1, n_actions, dim]
             xi_s = pred_pivot[0, pivot_action, :] # [dim]
             
-            # Compute Averaged Target over N samples
-            if k == task_i:
-                next_acts = self._get_next_actions_gpi(c_nexts, task_i)
-            else:
-                next_acts = self._get_next_action_prior(c_nexts, k)
+            # Averaged Target 
+            # a_hat = argmax_a' ( E[xi(s', a')] * w_i )
+            w_selection = torch.from_numpy(self.fit_w[task_i]).float().to(self.device)
             
-            pred_next_all = model(c_nexts) # [N, n_actions, dim]
+            # Forward pass all next states [N, A, D]
+            pred_next_all = model(c_nexts) 
+            
+            # Compute Mean Feature Vector over batch [A, D]
+            xi_next_mean = torch.mean(pred_next_all, dim=0) 
+            
+            # Select action that maximizes value on the mean features
+            q_next_mean = torch.matmul(xi_next_mean, w_selection)
+            hat_a = torch.argmax(q_next_mean).item()
+            
+            # Gather the specific SFs for that chosen action from the full batch
             indices = torch.arange(c_nexts.shape[0])
-            xi_next = pred_next_all[indices, next_acts, :] # [N, dim]
+            xi_next_selected = pred_next_all[indices, hat_a, :] # [N, dim]
             
-            # Element-wise target: phi_p + gamma_p * xi(s'_p)
-            targets_N = c_phis + c_gammas * xi_next
+            # Element-wise target: phi_p + gamma_p * xi(s'_p, hat{a})
+            targets_N = c_phis + c_gammas * xi_next_selected
             
-            # Average over N
-            target_bar = torch.mean(targets_N, dim=0) # [dim]
+            # Average the calculated targets
+            target_bar = torch.mean(targets_N, dim=0)
             
             diff = target_bar - xi_s
             loss = 0.5 * (diff.pow(2)).mean()
