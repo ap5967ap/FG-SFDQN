@@ -96,7 +96,8 @@ class DeepSF(SF):
             self.input_dim = task.encode_dim()
 
         # Build SF network
-        model, target_model = None
+        model = None
+        target_model = None
         if task._tasktype() == 0: # gridworld
             model = SFNetwork1(self.input_dim, self.n_actions, self.n_features).to(self.device)
             target_model = SFNetwork1(self.input_dim, self.n_actions, self.n_features).to(self.device)

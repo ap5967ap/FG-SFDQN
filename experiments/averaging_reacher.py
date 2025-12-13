@@ -3,37 +3,40 @@ import ast
 import configparser
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import matplotlib.pyplot as plt
-from tasks.gridworld import Shapes
+import seaborn as sns
+from tasks.reacher import Reacher
 from features.deep import DeepSF
 from features.deep_fg import DeepFGSF
 from agents.buffer import ReplayBuffer, ConditionalReplayBuffer
+from agents.dqn import DQN
 from agents.sfdqn import SFDQN
 from agents.fgsfdqn import FGSFDQN
 from utils.config import *
 
-fourroom_config()
+reacher_config()
 config_params = load_config()
 cfg = config_params
 
-def build_task_sequence(cfg):
-    maze = np.array(ast.literal_eval(cfg["TASK"]["maze"]), dtype=str)
-    rewards_pool = [
-        {'1': 1.0, '2': 0.0, '3': 0.0},
-        {'1': 0.0, '2': 1.0, '3': 0.0},
-        {'1': 0.0, '2': 0.0, '3': 1.0},
-        {'1': 1.0, '2': -1.0, '3': 0.0},
-        {'1': 0.0, '2': 1.0, '3': -1.0}
-    ]
-    
-    n_tasks = int(cfg["GENERAL"]["n_tasks"])
-    tasks = []
-    
-    for i in range(n_tasks):
-        r = rewards_pool[i % len(rewards_pool)]
-        tasks.append(Shapes(maze=maze, shape_rewards=r))
-        
-    return tasks
+gen_params = config_params['GENERAL']
+n_samples = int(gen_params['n_samples'])
+task_params = config_params['TASK']
+goals = ast.literal_eval(task_params['train_targets'])
+test_goals = ast.literal_eval(task_params['test_targets'])
+all_goals = goals + test_goals
+agent_params = config_params['AGENT']
+dqn_params = config_params['QL']
+sfdqn_params = config_params['SFQL']
+fgsfdqn_params = config_params['FGSF']
+
+def generate_tasks(include_target):
+    train_tasks = [Reacher(all_goals, i, include_target) for i in range(len(goals))]
+    test_tasks = [Reacher(all_goals, i + len(goals), include_target) for i in range(len(test_goals))]
+    return train_tasks, test_tasks
+
+train_tasks, test_tasks = generate_tasks(True)
 
 class AvgFGSFDQN(FGSFDQN):
     def train_agent(self, s, s_enc, a, r, s1, s1_enc, gamma):
@@ -71,7 +74,8 @@ class AvgFGSFDQN(FGSFDQN):
         batch = self.buffer.replay()
         if batch:
             self._update_batch_grouped_by_prior(batch, self.task_index)
-
+            
+            
 def run_experiment(agent_name, agent_params, cfg, tasks, n_trials, override_params=None):
     if override_params is None:
         override_params = {}
@@ -171,11 +175,8 @@ def run_experiment(agent_name, agent_params, cfg, tasks, n_trials, override_para
     return np.array(all_trials_data)
 
 cfg = load_config()
-tasks = build_task_sequence(cfg)
-
-n_trials = int(cfg["GENERAL"]["n_trials"])
-results = {}
-
+tasks = train_tasks
+n_trials = 1
 
 def run_alg1_ablation(cfg, tasks, n_trials=3):
     results = {}
@@ -229,8 +230,8 @@ def run_alg1_ablation(cfg, tasks, n_trials=3):
     plt.legend()
     plt.grid(True, linestyle=':', alpha=0.6)
     
-    filename = "ablation_alg1_averaging_4room.png"
+    filename = "ablation_alg1_averaging_reacher.png"
     plt.savefig(filename)
     plt.show()
     
-run_alg1_ablation(cfg, tasks, n_trials=1)
+run_alg1_ablation(cfg, train_tasks, n_trials=1)
