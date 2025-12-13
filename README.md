@@ -2,7 +2,7 @@
 # FG-SFDQN: Full-Gradient Successor Feature DQN
 
 
-This repository contains the implementation of **FG-SFDQN**, a framework that extends **Successor Feature DQN (SFDQN)** by performing **full-gradient minimization of the Bellman residual**. The approach is designed to improve **sample efficiency, **training stability**, and **transfer performance**.
+This repository contains the implementation of **FG-SFDQN**, a framework that extends **Successor Feature DQN (SFDQN)** by performing full-gradient minimization of the Bellman residual. The approach is designed to improve sample efficiency, training stability, and transfer performance.
 
 We empirically compare:
 - **DQN** (standard value-based baseline),
@@ -21,7 +21,7 @@ across two benchmark domains:
 
 Install core dependencies:
 ```bash
-pip install torch numpy matplotlib configparser
+pip install torch numpy matplotlib configparser seaborn
 ````
 
 ### PyBullet Setup (for Reacher)
@@ -42,7 +42,7 @@ pip install -e .
 ### 4-Room GridWorld
 
 * Discrete navigation with object collection.
-* Tasks differ by **reward vectors over object types**.
+* Tasks differ by reward vectors over object types.
 * State encoding includes agent position and object memory.
 
 ### Reacher (PyBullet)
@@ -68,7 +68,7 @@ Semi-gradient successor feature learning with Generalized Policy Improvement (GP
 
 ### FG-SFDQN (Ours)
 
-Minimizes the **full Mean Squared Bellman Error (MSBE)** by differentiating through both the prediction and the bootstrap target.
+Minimizes the full Mean Squared Bellman Error (MSBE) by differentiating through both the prediction and the bootstrap target.
 
 Implemented variants:
 
@@ -117,7 +117,7 @@ Evaluation reports average return over 10 test episodes per task.
 ![Training Curves – 4-Room](results/4room_training_rewards.jpeg)
 ![Training Curves – Reacher](results/reacher_training_rewards.png)
 
-FG-SFDQN (Alg 1) consistently achieves **higher cumulative reward in the low-sample regime**, demonstrating faster adaptation following task switches.
+FG-SFDQN (Alg 1) consistently achieves higher cumulative reward in the low-sample regime, demonstrating faster adaptation following task switches.
 
 ---
 
@@ -126,7 +126,7 @@ FG-SFDQN (Alg 1) consistently achieves **higher cumulative reward in the low-sam
 ![Averaging Ablation – 4-Room](results/avg-4room.png)
 ![Averaging Ablation – Reacher](results/avg-reacher.png)
 
-Averaging next-state encodings generally **degrades performance**, likely due to off-manifold targets and bias introduced in Bellman updates.
+Averaging next-state encodings generally degrades performance, likely due to off-manifold targets and bias introduced in Bellman updates.
 
 ---
 
@@ -137,15 +137,15 @@ Averaging next-state encodings generally **degrades performance**, likely due to
 ![Final Evaluation – 4-Room](results/final_eval_4room_fixed.png)
 ![Final Evaluation – Reacher](results/final_eval_reacher_fixed.png)
 
-FG-SFDQN (Alg 1) achieves **consistently positive returns across all tasks**, while DQN and SFDQN frequently fail to generalize.
+FG-SFDQN (Alg 1) achieves consistently positive returns across all tasks, while DQN and SFDQN frequently fail to generalize.
 
 ---
 
 ## Key Findings
 
-* **FG-SFDQN (Alg 1)** provides the best overall performance.
-* In **4-Room**, FG-SFDQN achieves nearly **2× cumulative reward** compared to SFDQN.
-* In **Reacher**, FG-SFDQN consistently outperforms semi-gradient baselines.
+* FG-SFDQN (Alg 1) provides the best overall performance.
+* In 4-Room, FG-SFDQN achieves nearly **2× cumulative reward** compared to SFDQN.
+* In Reacher, FG-SFDQN consistently outperforms semi-gradient baselines.
 
 
 See the [report](report.pdf) for theoretical guarantees and detailed analysis.
