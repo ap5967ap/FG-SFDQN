@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..')
 import seaborn as sns
 from tasks.gridworld import Shapes
 from features.deep import DeepSF

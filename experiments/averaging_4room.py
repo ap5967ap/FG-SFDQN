@@ -1,6 +1,8 @@
 import os
 import ast
 import configparser
+import sys
+sys.path.append('..')
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

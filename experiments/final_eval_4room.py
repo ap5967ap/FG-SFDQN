@@ -3,6 +3,8 @@ import os
 import ast
 import configparser
 import numpy as np
+import sys
+sys.path.append('..')
 import torch
 import torch.nn as nn
 import torch.optim as optim
