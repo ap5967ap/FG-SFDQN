@@ -1,1 +1,67 @@
-# FG-SFDQN
+
+```bash
+cd experiments
+python training_comparison_4room.py
+python training_comparison_reacher.py
+```
+
+### Averaging Ablation
+
+```bash
+cd experiments
+python averaging_4room.py
+python averaging_reacher.py
+```
+
+### Final Evaluation
+
+```bash
+cd experiments
+python final_eval_4room.py
+python final_eval_reacher.py
+```
+
+Evaluation reports average return over 10 test episodes per task.
+
+---
+
+## Results
+
+### Training Performance (4-Room & Reacher)
+
+![Training Curves – 4-Room](results/4room_training_rewards.jpeg)
+![Training Curves – Reacher](results/reacher_training_rewards.png)
+
+FG-SFDQN (Alg 1) consistently achieves **higher cumulative reward in the low-sample regime**, demonstrating faster adaptation following task switches.
+
+---
+
+### Averaging Ablation
+
+![Averaging Ablation – 4-Room](results/avg-4room.png)
+![Averaging Ablation – Reacher](results/avg-reacher.png)
+
+Averaging next-state encodings generally **degrades performance**, likely due to off-manifold targets and bias introduced in Bellman updates.
+
+---
+
+### Final Evaluation
+
+![Final Evaluation – 4-Room](results/final_eval_4room_fixed.png)
+![Final Evaluation – Reacher](results/final_eval_reacher_fixed.png)
+
+FG-SFDQN (Alg 1) achieves **consistently positive returns across all tasks**, while DQN and SFDQN frequently fail to generalize.
+
+---
+
+## Key Findings
+
+* **FG-SFDQN (Alg 1)** provides the best overall performance.
+* In **4-Room**, FG-SFDQN achieves nearly **2× cumulative reward** compared to SFDQN.
+* In **Reacher**, FG-SFDQN consistently outperforms semi-gradient baselines.
+
+
+See the [report](report.pdf) for theoretical guarantees and detailed analysis.
+
+
+
