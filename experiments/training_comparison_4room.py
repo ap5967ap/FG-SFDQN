@@ -16,7 +16,7 @@ from agents.sfdqn import SFDQN
 from agents.fgsfdqn import FGSFDQN
 from utils.config import *
 
-reacher_config()
+fourroom_config()
 config_params = load_config()
 cfg = config_params
 
