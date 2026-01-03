@@ -17,8 +17,9 @@ from agents.buffer import ReplayBuffer, ConditionalReplayBuffer
 from agents.dqn import DQN
 from agents.sfdqn import SFDQN
 from agents.fgsfdqn import FGSFDQN
-from agents.dqn import DQN
 from utils.utils import save_agent_weights
+import pickle
+import json
 
 
 
@@ -409,7 +410,35 @@ def save_raw_results(raw_results, filename="raw_results.npz"):
     np.savez_compressed(filename, **raw_results)
     print(f"[OK] Raw results saved to {filename}")
 
+
+def save_tasks(tasks, cfg, root="weights"):
+    task_dir = os.path.join(root, "tasks")
+    os.makedirs(task_dir, exist_ok=True)
+
+    # Save full objects
+    with open(os.path.join(task_dir, "tasks.pkl"), "wb") as f:
+        pickle.dump(tasks, f)
+
+    # Save metadata
+    maze = ast.literal_eval(cfg["TASK"]["maze"])
+    rewards = [dict(t.shape_rewards) for t in tasks]
+
+    meta = {
+        "n_tasks": len(tasks),
+        "maze": maze,
+        "shape_rewards": rewards
+    }
+
+    with open(os.path.join(task_dir, "tasks_meta.json"), "w") as f:
+        json.dump(meta, f, indent=2)
+
+    logger.info("Tasks saved successfully")
+
+
 cfg = load_config()
 tasks = build_task_sequence(cfg)
 raw_results = run_all_experiments(cfg, tasks, n_trials=5)
+try:
+    save_tasks(tasks, cfg)
+except:...
 save_raw_results(raw_results, filename="results.npz")
