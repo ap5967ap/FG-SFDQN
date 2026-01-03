@@ -344,7 +344,7 @@ def run_experiment(agent_name, agent_params, cfg, tasks, n_trials, override_para
             else:
                  trial_history = trial_history[:total_data_points]
 
-        save_agent_weights(agent, agent_name, trial + 1)
+        save_agent_weights(agent, agent_name, trial)
         all_trials_data.append(trial_history)
  
     logger.info(f"All experiments for {agent_name} completed successfully")
