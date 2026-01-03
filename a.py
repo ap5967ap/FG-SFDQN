@@ -1,8 +1,3 @@
-
-import sys
-sys.path.append(rf'/kaggle/input/advrlclone/adv_rl (Copy)')
-
-
 import os
 import ast
 import configparser
