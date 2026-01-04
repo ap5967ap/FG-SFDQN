@@ -1,3 +1,4 @@
+
 import os
 import ast
 import configparser
@@ -8,8 +9,6 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import logging
 from datetime import datetime
-# --- Import Agents and Tasks ---
-# Assumes the file structure provided in the prompt exists
 from tasks.gridworld import Shapes
 from features.deep import DeepSF
 from features.deep_fg import DeepFGSF
@@ -435,10 +434,20 @@ def save_tasks(tasks, cfg, root="weights"):
     logger.info("Tasks saved successfully")
 
 
+
+
+
 cfg = load_config()
 tasks = build_task_sequence(cfg)
+
+
+save_tasks(tasks, cfg)
+
+
+!cat /kaggle/working/weights/tasks/tasks_meta.json
+
+
 raw_results = run_all_experiments(cfg, tasks, n_trials=5)
-try:
-    save_tasks(tasks, cfg)
-except:...
 save_raw_results(raw_results, filename="results.npz")
+
+

@@ -48,41 +48,24 @@ class FGSFDQN(SFDQN):
             self.sf.update_single_sample(sub_batch, task_i, task_c)
 
     def train_agent(self, s, s_enc, a, r, s1, s1_enc, gamma):
-        # Store transition + reward update for all algorithms
+        # Algorithm 1: Sequential Update
+        if self.algorithm != 'alg1':
+            # Store data for Alg 2/3
+            phi = self.phi(s, a, s1)
+            if isinstance(phi, torch.Tensor): phi = phi.detach().cpu().numpy()
+            self.buffer.append(s_enc, a, phi, s1_enc, gamma)
+            self.sf.update_reward(phi, r, self.task_index)
+            return
+
         phi = self.phi(s, a, s1)
-        if isinstance(phi, torch.Tensor):
-            phi = phi.detach().cpu().numpy()
+        if isinstance(phi, torch.Tensor): phi = phi.detach().cpu().numpy()
         self.sf.update_reward(phi, r, self.task_index)
         self.buffer.append(s_enc, a, phi, s1_enc, gamma)
-
-        if self.algorithm == 'alg1':
-            # Algorithm 1: Sequential, single-sample update
-            batch = self.buffer.replay()
-            if batch:
-                self._update_batch_grouped_by_prior(batch, self.task_index)
-            return
-
-        if self.algorithm == 'alg4':
-            # Algorithm 4: Algorithm 1 + averaging (as in Algorithm 3)
-            # Uses a pivot (s,a) and a conditional batch to compute an averaged target
-            # and an averaged prior-policy index.
-            pivot = self.buffer.sample_pivot()
-            if not pivot:
-                return
-
-            p_s, p_a, _, _, _ = pivot
-            cond_batch = self.buffer.sample_conditional(p_s, p_a, self.n_averaging)
-            if not cond_batch:
-                return
-
-            _, _, _, c_next_states, _ = cond_batch
-            c = self.sf.get_averaged_gpi_policy_index(c_next_states, self.task_index)
-            task_c = c if c != self.task_index else None
-            self.sf.update_averaged(p_s, p_a, cond_batch, self.task_index, task_c)
-            return
-
-        # For Alg 2/3 (randomized training), updates happen inside train_randomized
-        return
+        
+        batch = self.buffer.replay()
+        if batch:
+            # Group by optimal Prior c
+            self._update_batch_grouped_by_prior(batch, self.task_index)
 
     def train_randomized(self, train_tasks, n_total_steps, viewers=None, n_view_ev=None):
         if viewers is None: viewers = [None] * len(train_tasks)
@@ -125,7 +108,9 @@ class FGSFDQN(SFDQN):
                     if cond_batch:
                         _, _, _, c_next_states, _ = cond_batch
                         
-                        c = self.sf.get_averaged_gpi_policy_index(c_next_states, i)
+                        # Use Mean Feature of (encoded) next states to select c
+                        mean_next_state_feature = np.mean(c_next_states, axis=0)
+                        c = self._get_gpi_policy(mean_next_state_feature, i)[0]
                         
                         task_c = c if c != i else None
                         self.sf.update_averaged(p_s, p_a, cond_batch, i, task_c)

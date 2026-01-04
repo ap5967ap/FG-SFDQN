@@ -23,10 +23,7 @@ class Reacher(Task):
         for a1 in actions:
             for a2 in actions:
                 self.action_dict[len(self.action_dict)] = (a1, a2)
-    
-    def _tasktype(self):
-        return 1
-    
+        
     def clone(self):
         return Reacher(self.target_positions, self.task_index, self.include_target_in_state, self.device)
     
